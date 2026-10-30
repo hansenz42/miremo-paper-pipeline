@@ -74,14 +74,22 @@ export default function PaperStudio({ initialRun }: { initialRun: Run }) {
   const selected = run.candidates.find((c) => c.id === selectedId) || run.candidates[0];
   const filtered = useMemo(
     () =>
-      run.candidates.filter(
-        (c) =>
-          (filter === 'all' || (filter === 'processed' ? c.modelProcessed : c.status === filter)) &&
-          (!query ||
-            [c.name, c.canonicalName, ...c.aliases].some((v) =>
-              v?.toLowerCase().includes(query.toLowerCase()),
-            )),
-      ),
+      run.candidates
+        .filter(
+          (c) =>
+            (filter === 'all' ||
+              (filter === 'processed' ? c.modelProcessed : c.status === filter)) &&
+            (!query ||
+              [c.name, c.canonicalName, ...c.aliases].some((v) =>
+                v?.toLowerCase().includes(query.toLowerCase()),
+              )),
+        )
+        .sort(
+          (a, b) =>
+            Number(b.status === 'retain') - Number(a.status === 'retain') ||
+            b.spans.length - a.spans.length ||
+            a.id.localeCompare(b.id),
+        ),
     [run, query, filter],
   );
   const processed = run.candidates.filter((c) => c.modelProcessed).length;
@@ -167,8 +175,6 @@ export default function PaperStudio({ initialRun }: { initialRun: Run }) {
             {run.provenance.kind === 'historical_model_run' ? '历史模型结果' : '当前运行'}
           </span>
           <span>{run.provenance.model}</span>
-          <span className="separator">/</span>
-          <span>待人工确认</span>
         </div>
         <div className="run-numbers">
           <span>
@@ -496,9 +502,7 @@ export default function PaperStudio({ initialRun }: { initialRun: Run }) {
                   </div>
                 </section>
               )}
-              <p className="review-note">
-                模型处理结果，尚待人工确认。高亮只表示原文位置，不代表术语已被正式采纳。
-              </p>
+              <p className="review-note">高亮表示候选词在论文中的原文位置。</p>
             </div>
           )}
         </aside>
