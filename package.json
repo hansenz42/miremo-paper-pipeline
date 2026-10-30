@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1 -p 3030",
     "build": "next build",
-    "start": "next start --hostname 127.0.0.1 -p 3030",
+    "start": "serve out -l tcp://127.0.0.1:3030",
     "test": "vitest run",
     "typecheck": "next typegen && tsc --noEmit",
     "paper": "tsx --env-file-if-exists=.env.local scripts/paper.ts",
@@ -26,6 +26,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "prettier": "3.8.2",
+    "serve": "14.2.5",
     "tsx": "^4.20.0",
     "typescript": "^5.9.0",
     "vitest": "^3.2.0"

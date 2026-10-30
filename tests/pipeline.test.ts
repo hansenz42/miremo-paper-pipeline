@@ -7,7 +7,6 @@ import { createRun, step, advance } from '../lib/pipeline';
 import { loadRun, saveRun, withLock } from '../lib/store';
 import { ontology } from '../lib/types';
 import { highlightedSegments } from '../lib/highlights';
-import { authorize, publicRun } from '../lib/http';
 import { ask, type Ask } from '../lib/model';
 import { z } from 'zod';
 let dir: string;
@@ -202,8 +201,8 @@ describe('model transport', () => {
     expect(run.attemptedCalls).toBe(1);
     vi.stubEnv('PAPER_MAX_CALLS', '1');
     await expect(ask(run, 'b', 'prompt', {}, schema)).rejects.toThrow('上限');
-    expect(JSON.stringify(publicRun(run))).not.toContain('modelConfig');
-    expect(JSON.stringify(publicRun(run))).not.toContain('test-key');
+    expect(JSON.stringify(ontology(run))).not.toContain('modelConfig');
+    expect(JSON.stringify(ontology(run))).not.toContain('test-key');
   });
   it('does not accept truncated outputs', async () => {
     const run = await createRun({ title: 'Example', text: 'Attention maps keys.' });
@@ -214,16 +213,5 @@ describe('model transport', () => {
     );
     await expect(ask(run, 'a', 'prompt', {}, z.object({}))).rejects.toThrow('完整');
     expect(run.attemptedCalls).toBe(1);
-  });
-});
-describe('execution authentication', () => {
-  it('requires a token and rejects cross-origin requests', () => {
-    const req = (token: string, origin = 'http://localhost:3030') =>
-      new Request('http://localhost:3030/api/runs', {
-        headers: { host: 'localhost:3030', 'x-run-token': token, origin },
-      });
-    expect(() => authorize(req('wrong'))).toThrow('UNAUTHORIZED');
-    expect(() => authorize(req('test-passphrase', 'https://evil.example'))).toThrow('UNAUTHORIZED');
-    expect(() => authorize(req('test-passphrase'))).not.toThrow();
   });
 });

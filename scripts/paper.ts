@@ -34,7 +34,7 @@ if (values.export) {
         attention: values.attention,
         text: values.input ? await readFile(values.input, 'utf8') : undefined,
       });
-  console.log(`Run: ${run.id}\nPage: http://localhost:3030/?run=${run.id}`);
+  console.log(`Run: ${run.id}`);
   while (run.stage !== 'complete') {
     run = await advance(run.id);
     console.log(progress(run));

@@ -1,24 +1,21 @@
 'use client';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowDownToLine,
   ArrowLeft,
   ArrowRight,
   ArrowUpRight,
   BookOpen,
-  Check,
   ChevronDown,
   FileText,
   Layers,
-  LoaderCircle,
-  Play,
-  Plus,
   Search,
   SlidersHorizontal,
   Sparkles,
   X,
 } from 'lucide-react';
-import type { Run, Candidate, Span, Progress, Meta } from '@/lib/types';
+import type { Run, Candidate, Span, Meta } from '@/lib/types';
+import { ontology } from '@/lib/types';
 import { highlightedSegments } from '@/lib/highlights';
 const labels: Record<Candidate['status'], string> = {
   retain: '保留',
@@ -26,12 +23,6 @@ const labels: Record<Candidate['status'], string> = {
   exclude: '排除',
   pending: '待确认',
   unprocessed: '未处理',
-};
-const stages = {
-  meta: '生成阅读提纲',
-  reading: '逐片细读',
-  organize: '整理候选词表',
-  complete: '处理完成',
 };
 function MetaCard({
   meta,
@@ -67,84 +58,19 @@ function MetaCard({
   );
 }
 export default function PaperStudio({ initialRun }: { initialRun: Run }) {
-  const [run, setRun] = useState(initialRun),
-    [selectedId, setSelectedId] = useState('J0055'),
-    [query, setQuery] = useState(''),
-    [filter, setFilter] = useState('all'),
-    [limit, setLimit] = useState(80);
-  const [view, setView] = useState<'paper' | 'meta'>('paper'),
-    [allMarks, setAllMarks] = useState(false),
-    [occurrence, setOccurrence] = useState(0),
-    [modal, setModal] = useState(false),
-    [token, setToken] = useState(''),
-    [source, setSource] = useState('attention'),
-    [text, setText] = useState(''),
-    [title, setTitle] = useState('Attention Is All You Need');
-  const [busy, setBusy] = useState(false),
-    [message, setMessage] = useState(''),
-    [job, setJob] = useState<Progress | null>(null),
-    [enabled, setEnabled] = useState(false),
-    [mobile, setMobile] = useState<'list' | 'paper' | 'detail'>('paper');
-  const [recent, setRecent] = useState<{ id: string; title: string }[]>([]);
-  const pause = useRef(false),
-    loaded = useRef(false);
+  const run = initialRun;
+  const [selectedId, setSelectedId] = useState('J0055');
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [limit, setLimit] = useState(80);
+  const [view, setView] = useState<'paper' | 'meta'>('paper');
+  const [allMarks, setAllMarks] = useState(false);
+  const [occurrence, setOccurrence] = useState(0);
+  const [mobile, setMobile] = useState<'list' | 'paper' | 'detail'>('paper');
   useEffect(() => {
-    fetch('/api/runs')
-      .then((r) => r.json())
-      .then((d) => setEnabled(d.executionEnabled))
-      .catch(() => {});
-    const saved = sessionStorage.getItem('paper-run-token') || '';
-    setToken(saved);
-    try {
-      setRecent(JSON.parse(localStorage.getItem('paper-recent') || '[]'));
-    } catch {}
-    const id = new URLSearchParams(location.search).get('run');
-    if (!id) {
-      const first = initialRun.candidates.find((c) => c.id === 'J0055')?.spans[0];
-      if (first) jump(first);
-    }
-    if (id && id !== 'attention-demo' && !loaded.current) {
-      loaded.current = true;
-      openRun(id, saved);
-    }
-    // Initial hydration only; ongoing task state is managed explicitly.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  useEffect(() => {
-    if (!modal) return;
-    const before = document.activeElement as HTMLElement;
-    const dialog = document.querySelector<HTMLElement>('.modal');
-    const focusable = () =>
-      Array.from(
-        dialog?.querySelectorAll<HTMLElement>(
-          'button:not(:disabled), input, select, textarea, a[href]',
-        ) || [],
-      );
-    focusable()[0]?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setModal(false);
-        return;
-      }
-      if (e.key === 'Tab') {
-        const nodes = focusable(),
-          first = nodes[0],
-          last = nodes.at(-1);
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last?.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first?.focus();
-        }
-      }
-    };
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      before?.focus();
-    };
-  }, [modal]);
+    const first = initialRun.candidates.find((c) => c.id === 'J0055')?.spans[0];
+    if (first) jump(first);
+  }, [initialRun]);
   const selected = run.candidates.find((c) => c.id === selectedId) || run.candidates[0];
   const filtered = useMemo(
     () =>
@@ -191,93 +117,14 @@ export default function PaperStudio({ initialRun }: { initialRun: Run }) {
     setOccurrence(n);
     jump(spans[n]);
   }
-  async function jsonFetch(url: string, options: RequestInit = {}, pass = token) {
-    const res = await fetch(url, {
-      ...options,
-      headers: { 'Content-Type': 'application/json', 'x-run-token': pass, ...options.headers },
-    });
-    const value = await res.json();
-    if (!res.ok) throw new Error(value.error || '请求失败');
-    return value;
-  }
-  async function openRun(id: string, pass = token) {
-    try {
-      setMessage('');
-      const data = await jsonFetch(`/api/runs/${id}`, {}, pass);
-      setRun(data.run);
-      setJob(id === 'attention-demo' ? null : data.progress);
-      setSelectedId(
-        data.run.candidates.find((c: Candidate) => c.name.toLowerCase() === 'transformer')?.id ||
-          data.run.candidates[0]?.id ||
-          '',
-      );
-      setQuery('');
-      setFilter('all');
-      setLimit(80);
-      history.replaceState(null, '', id === 'attention-demo' ? '/' : `/?run=${id}`);
-    } catch (e) {
-      setMessage((e as Error).message);
-    }
-  }
-  async function drive(id: string) {
-    pause.current = false;
-    setBusy(true);
-    setMessage('');
-    try {
-      while (!pause.current) {
-        const p: Progress = await jsonFetch(`/api/runs/${id}/advance`, { method: 'POST' });
-        setJob(p);
-        if (p.status === 'failed') throw new Error(p.error || '任务失败');
-        if (p.stage === 'complete') break;
-      }
-      await openRun(id);
-    } catch (e) {
-      setMessage((e as Error).message);
-      await openRun(id);
-      setMessage((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function start() {
-    setMessage('');
-    setBusy(true);
-    sessionStorage.setItem('paper-run-token', token);
-    try {
-      const p: Progress = await jsonFetch('/api/runs', {
-        method: 'POST',
-        body: JSON.stringify({
-          title,
-          attention: source === 'attention',
-          ...(source === 'text' ? { text } : {}),
-        }),
-      });
-      const items = [{ id: p.id, title }, ...recent.filter((r) => r.id !== p.id)].slice(0, 10);
-      setRecent(items);
-      localStorage.setItem('paper-recent', JSON.stringify(items));
-      setModal(false);
-      await openRun(p.id);
-      await drive(p.id);
-    } catch (e) {
-      setMessage((e as Error).message);
-      setBusy(false);
-    }
-  }
-  async function download() {
-    try {
-      const res = await fetch(`/api/runs/${run.id}/ontology`, {
-        headers: { 'x-run-token': token },
-      });
-      if (!res.ok) throw new Error('导出失败，请检查运行口令。');
-      const url = URL.createObjectURL(await res.blob());
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${run.id}-terms.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      setMessage((e as Error).message);
-    }
+  function download() {
+    const blob = new Blob([JSON.stringify(ontology(run), null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${run.id}-terms.json`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   return (
@@ -292,7 +139,6 @@ export default function PaperStudio({ initialRun }: { initialRun: Run }) {
           </strong>
         </a>
         <div className="top-actions">
-          <span className="type-tag">TERM ONLY</span>
           <a
             href="https://github.com/hansenz42/miremo-paper-pipeline"
             target="_blank"
@@ -304,9 +150,6 @@ export default function PaperStudio({ initialRun }: { initialRun: Run }) {
       </header>
       <section className="hero">
         <div className="hero-heading">
-          <div className="eyebrow">
-            <span className="live-dot" /> READING, WITH EVIDENCE
-          </div>
           <h1>{run.title}</h1>
           <p className="hero-subtitle">从词语到概念，让每一个术语都有出处。</p>
         </div>
@@ -314,10 +157,6 @@ export default function PaperStudio({ initialRun }: { initialRun: Run }) {
           <button className="secondary" onClick={download}>
             <ArrowDownToLine size={16} />
             导出 TERM 集合
-          </button>
-          <button className="primary" onClick={() => setModal(true)} disabled={busy}>
-            <Plus size={16} />
-            新建处理任务
           </button>
         </div>
       </section>
@@ -343,42 +182,6 @@ export default function PaperStudio({ initialRun }: { initialRun: Run }) {
           </span>
         </div>
       </section>
-      {message && (
-        <div role="alert" className="message">
-          {message}
-          <button onClick={() => setMessage('')} aria-label="关闭提示">
-            <X size={16} />
-          </button>
-        </div>
-      )}
-      {job && (
-        <section className="job-strip" aria-live="polite">
-          <div>
-            {busy ? <LoaderCircle className="spin" size={16} /> : <Check size={16} />}
-            <b>{stages[job.stage]}</b>
-            <span>
-              {job.cursor} / {job.total} · {job.attemptedCalls} 次请求
-            </span>
-          </div>
-          {busy ? (
-            <button
-              onClick={() => {
-                pause.current = true;
-                setMessage('当前步骤结束后暂停，已完成结果会保留。');
-              }}
-            >
-              暂停
-            </button>
-          ) : (
-            job.stage !== 'complete' && (
-              <button onClick={() => drive(job.id)}>
-                继续处理 <Play size={13} />
-              </button>
-            )
-          )}
-          <progress max={Math.max(job.total, 1)} value={job.cursor} />
-        </section>
-      )}
       <nav className="mobile-tabs">
         {(
           [
@@ -703,111 +506,17 @@ export default function PaperStudio({ initialRun }: { initialRun: Run }) {
       <footer className="footer">
         <span>MIREMO PAPER STUDIO</span>
         <span>Read closely. Keep the evidence.</span>
-        <button onClick={() => openRun('attention-demo')}>
+        <button
+          onClick={() => {
+            setQuery('');
+            setFilter('all');
+            const candidate = run.candidates.find((c) => c.id === 'J0055');
+            if (candidate) choose(candidate);
+          }}
+        >
           查看 Attention 示例 <ArrowUpRight size={12} />
         </button>
       </footer>
-      {modal && (
-        <div className="modal-backdrop" onClick={() => !busy && setModal(false)}>
-          <section
-            className="modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label="新建处理任务"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="modal-head">
-              <div>
-                <span className="eyebrow">NEW READING</span>
-                <h2>让论文成为可追溯的术语集合</h2>
-              </div>
-              <button onClick={() => setModal(false)} aria-label="关闭">
-                <X size={20} />
-              </button>
-            </div>
-            <p>依次生成阅读提纲、细读正文并整理 TERM 候选。每一步都会保存，可以暂停后继续。</p>
-            {!enabled && (
-              <div className="notice">
-                此服务尚未配置模型运行。你仍可浏览完整的 Attention 历史示例。
-              </div>
-            )}
-            <label>
-              文档来源
-              <select
-                value={source}
-                onChange={(e) => {
-                  setSource(e.target.value);
-                  if (e.target.value === 'attention') setTitle('Attention Is All You Need');
-                }}
-              >
-                <option value="attention">Attention Is All You Need · 已提取正文</option>
-                <option value="text">粘贴英文 Markdown / 文本</option>
-              </select>
-            </label>
-            <label>
-              任务名称
-              <input value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} />
-            </label>
-            {source === 'text' && (
-              <label>
-                英文正文
-                <textarea
-                  rows={6}
-                  maxLength={200000}
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  placeholder="粘贴论文正文，建议保留章节标题…"
-                />
-              </label>
-            )}
-            <label>
-              运行口令
-              <input
-                type="password"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                autoComplete="off"
-                placeholder="服务管理员设置的运行口令"
-              />
-            </label>
-            {recent.length > 0 && (
-              <label>
-                继续已有任务
-                <select
-                  defaultValue=""
-                  onChange={(e) => {
-                    sessionStorage.setItem('paper-run-token', token);
-                    setModal(false);
-                    openRun(e.target.value);
-                  }}
-                >
-                  <option value="" disabled>
-                    选择已保存的任务
-                  </option>
-                  {recent.map((r) => (
-                    <option value={r.id} key={r.id}>
-                      {r.title} · {r.id.slice(0, 8)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            {message && <p className="error">{message}</p>}
-            <div className="modal-bottom">
-              <span>需要调用模型 API，消耗取决于候选数量。</span>
-              <button
-                className="primary"
-                disabled={
-                  !enabled || busy || !token || !title.trim() || (source === 'text' && !text.trim())
-                }
-                onClick={start}
-              >
-                {busy ? <LoaderCircle className="spin" size={16} /> : <Play size={15} />}开始处理
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
     </main>
   );
 }
