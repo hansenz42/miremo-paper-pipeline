@@ -1,0 +1,6 @@
+data/*.json
+pnpm-lock.yaml
+.next*/
+node_modules/
+.venv/
+output/

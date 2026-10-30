@@ -1,94 +1,85 @@
-# Miremo Paper Pipeline
+# Miremo Paper Studio
 
-一个面向英文论文的术语抽取工具，提供预选、文章与章节 Meta、逐分片细读和词表整理的完整命令行流程。输出包含术语名称、定义、原文位置和归并映射。以 [Attention Is All You Need](https://arxiv.org/abs/1706.03762) 为例。
+使用 Next.js 阅读论文、运行 TERM 抽取，并查看每个候选词的模型判断与原文位置。前后端均为 TypeScript，运行时无需 Python。
 
-配套文章：[从文档到知识图谱：用 Ontology 引导文档预处理](https://www.imassen.com/blog/2026-10-28-doc-ontology-keywords-draft/)。
+- **执行流水线**：术语预选 → 文章／章节 Meta → 逐片细读 → 候选判断与定义整理 → 导出 TERM ontology JSON。
+- **阅读结果页面**：候选搜索和状态筛选、正文高亮、逐次出现位置跳转、规范名称、别名、定义、阅读批注及证据。
 
-处理范围固定为 **TERM（术语）**，无需提供 Ontology。
+内置《Attention Is All You Need》的真实历史模型结果：998 条候选均有模型判断记录，最终保留 160 条术语。无需配置 API Key 即可查看。模型处理不等于人工确认或知识图谱采纳。
 
-## 安装
+## 启动
 
-Python 3.11。无需启动 Miremo、数据库或个人知识图谱。
-
-```sh
-python3.11 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python -m spacy download en_core_web_sm
-python -c "import tiktoken; tiktoken.get_encoding('cl100k_base')"
-```
-
-固定依赖版本见 `requirements-lock.txt`，可用 `pip install -r requirements-lock.txt` 安装。英文模型从官方 GitHub Release 下载。
-
-## 运行
-
-先下载论文并执行本地预选（不调用大模型）：
+Node.js 22.17+、pnpm 10。
 
 ```sh
-python run.py --attention --output output/attention
+pnpm install
+pnpm dev
 ```
 
-也可提供自己的英文 Markdown、纯文本或 PDF：
+打开 [localhost:3030](http://localhost:3030)。左侧选择候选词，中间查看原文高亮，右侧查看模型判断和定义。所有候选都保留，包括被排除和待确认的词；可切换到“保留”筛选。
+
+## 执行新任务
+
+复制 `.env.example` 为 `.env.local`，设置：
+
+```dotenv
+PAPER_API_KEY=your-api-key
+PAPER_BASE_URL=https://your-provider.example/v1
+PAPER_MODEL=your-model
+PAPER_RUN_TOKEN=your-private-access-passphrase
+PAPER_MAX_CALLS=500
+PAPER_REQUEST_OPTIONS={}
+```
+
+模型须支持 OpenAI-compatible Chat Completions 和 JSON object 输出。`PAPER_REQUEST_OPTIONS` 可填服务商所需的额外请求字段；不能覆盖模型、消息或输出格式。服务端保管 API Key；浏览器通过运行口令创建或继续任务。
+
+重启开发服务，点击“新建处理任务”，选择 Attention 正文或粘贴英文 Markdown / 纯文本，输入运行口令后开始。执行期间保持页面打开；暂停会在当前步骤结束后生效。任务数据保存在 `.paper-runs/`，重新打开任务 URL 后输入口令可继续。
+
+也可使用命令行（读取 `.env.local`）：
 
 ```sh
-python run.py --input paper.md --output output/my-paper
+pnpm paper --attention
+pnpm paper --input paper.md --title "My paper" --output terms.json
+pnpm paper --resume RUN_ID
+pnpm paper --export attention-demo --output attention-terms.json
 ```
 
-编辑 `config/model.json`：填写支持 Chat Completions、JSON object 输出的模型名称及服务地址。`request_options` 可设置服务商所需参数，例如 `{"extra_body":{"enable_thinking":false}}`，仅在所选服务支持时使用。API Key 从环境变量读取，不放进配置文件：
-
-```sh
-export PAPER_API_KEY='你的 API Key'
-python run.py --attention --output output/attention --execute --max-calls 500
-```
-
-预选不绑定模型配置，可以先查看候选表再配置模型。首次 `--execute` 后，该输出目录绑定模型配置；输入、内置 TERM 规则、代码、依赖版本或已绑定的模型配置改变时须换目录。完整流程可能有数百次模型请求，消耗取决于词表大小和模型。`--max-calls` 限制该输出目录累计的请求尝试数，**不是金额或 token 上限**。服务商的账户预算应自行设置。
-
-执行失败后，用相同参数重跑：已完成且请求哈希一致的模型返回会复用，失败的调用会重试。达到请求上限时，可提高 `--max-calls` 后继续。输入超过预算时明确报错或拆分独立候选，不静默截断候选表。
+`PAPER_MAX_CALLS` 是每个任务累计请求尝试数的上限，不是金额上限。失败步骤不会标为完成；经过校验的模型响应可复用。修改模型配置应创建新任务。
 
 ## 输出
 
-| 文件 | 内容 |
-| --- | --- |
-| `input.txt` | 实际处理的文本快照 |
-| `tables/shards.json`、`tables/chapters.json` | 章节、分片、原文位置与阅读顺序 |
-| `rankings.json` | 全量 JATE 原始评分 |
-| `tables/candidates.json` | 初始名称、评分、出现位置、关联分片和候选字段 |
-| `document-meta.json` | 文章概述、文档作用、术语关注方向和来源 |
-| `chapter-meta.json` | 各章概述、章节作用、关注方向与不确定性 |
-| `reading/` | 细读批注、新术语候选、名称建议及模型调用记录 |
-| `final-candidates.json` | 整理后的全部对象，包含 retain / exclude / pending 状态 |
-| `candidate-mapping.json` | 原候选到规范名称的归并映射 |
-| `summary.json` | 候选整理阶段统计；阅读阶段用量见 reading 调用回执 |
-| `REPORT.md` | 人可读的结果入口与保留术语定义 |
-| `refinement/` | 判断、身份比较、定义生成及逐条正文依据 |
-| `manifest.json`、`model-config.json` | 输入和代码哈希、依赖及模型配置 |
+导出的 TERM 集合包括：
 
-最终词表保留排除和待确认项，便于追踪每个初始候选的去向。模型整理完成不代表事实已人工核验，也不等于写入知识图谱。
+- `terms`：保留的术语、规范名称、别名、定义、成员 ID 和证据。
+- `candidates`：全部候选、算法分数、精确出现位置、阅读批注、模型处理状态及保留／排除／待确认判断。
+- `documentMeta` / `chapterMeta`：阅读概述、关注方向和来源。
+- `provenance`：模型、算法及结果来源。
 
-## 执行流程与算法
+字符位置采用 JavaScript UTF-16 索引，相对于对应的正文分片；高亮前会再次检查原文。没有精确词面位置的模型新发现项只提供证据段落跳转。`complete: false` 表示流水线尚未完成。所有结果的 `finalAdoption` 均为 `false`。
 
-1. **输入适配**：PDF 使用 pypdf 提取文本；英文编号标题或 Markdown 标题识别章节。推荐检查 `input.txt` 与章节表，复杂公式、表格和多栏 PDF 的提取可能失真。
-2. **分片**：采用结构优先切片，目标约 1000 字符、上限 1200 字符，保留原文偏移与阅读顺序。
-3. **预选**：spaCy `en_core_web_sm` 分词和词性标注，JATE 3.3.0 C-Value 对全文的 1–5 词候选评分，最低频次 1；清理名称、名词词形去重，不做 Top-K 截断。
-4. **原文定位**：使用名词词形匹配，记录出现分片及精确字符位置。
-5. **粗读**：模型抽样生成文章和章节 Meta；Meta 是阅读辅助，不是事实证据。
-6. **细读**：逐分片读取正文、Meta 与相关候选，累积语境理解、名称建议和新候选。
-7. **整理**：先逐候选判断，再比较疑似同义对象，最后回到引用正文生成定义；保留归并映射和证据。
+## 算法与范围
 
-## 适用范围与限制
+新任务使用 winkNLP 英文分词／词性标注和 TypeScript C-Value：抽取 1–5 词的形容词／名词短语，以名词结尾，按词形归一汇总全文频次，不做 Top-K 截断。模型按分片补充阅读批注、发现新术语，再逐候选生成有原文依据的判断和定义。新任务不跨候选 ID 自动归并；同名项保留独立记录以供复核。
 
-- 支持英文论文中的术语抽取，不处理其他实体类型、关系抽取或知识图谱写入。
-- PDF 中的公式、表格、图片和多栏排版可能无法完整还原，建议先检查提取文本；也可直接提供整理后的 Markdown。
-- 模型生成的定义和归并结果需要人工检查。输入文本、模型与处理版本不同，结果可能与配套文章中的示例不同。
+内置历史结果使用 spaCy + JATE，并经过后续归并、去噪及追加审阅。它展示已有的真实模型运行结果，不代表使用当前 TypeScript 流水线重新运行；两者的候选数量不保证相同。详细数据说明见 [data/README.md](data/README.md)。
 
-## 测试
+仅处理 TERM，不需要输入 Ontology，不抽取关系或写入知识图谱。输入支持英文 Markdown / 文本及内置 Attention 提取文本；PDF 图片、公式和表格请对照原论文，当前版本不提供 PDF 文件解析。
+
+## 运行与测试
 
 ```sh
-python -m unittest discover -s tests -v
+pnpm test
+pnpm typecheck
+pnpm build
+pnpm start
 ```
 
-测试使用模拟模型回答，覆盖数据流、证据约束、失败处理和续跑机制，无需 API Key。测试通过不代表真实模型的抽取质量。
+默认采用持久化文件系统，适合本地或自托管 Node 服务。执行接口每次推进一个模型步骤，页面或 CLI 连续调用。请勿直接将文件存储运行模式部署到临时文件系统的 Serverless 环境；公开只读展示可使用内置示例，在线执行需要持久化存储和受保护的运行口令。
+
+服务异常退出后，若任务提示“正在处理”，先确认对应进程已停止，再清理该任务目录下的 `active.lock` 并继续。不要在任务执行时移除锁。
 
 ## 许可证
 
-代码使用 [MIT 许可证](LICENSE)。第三方依赖及模型遵循各自的许可证。论文由使用者从 arXiv 下载，其内容不属于本代码的 MIT 授权范围。
+代码采用 [MIT](LICENSE)。论文与第三方依赖遵循各自的授权。
+
+配套文章：[从文档到知识图谱：用 Ontology 引导文档预处理](https://www.imassen.com/blog/2026-10-28-doc-ontology-keywords-draft/)。

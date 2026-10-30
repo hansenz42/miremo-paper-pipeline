@@ -1,0 +1,37 @@
+{
+  "name": "miremo-paper-pipeline",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1 -p 3030",
+    "build": "next build",
+    "start": "next start --hostname 127.0.0.1 -p 3030",
+    "test": "vitest run",
+    "typecheck": "next typegen && tsc --noEmit",
+    "paper": "tsx --env-file-if-exists=.env.local scripts/paper.ts",
+    "format": "prettier --write app components lib scripts tests *.ts *.json README.md"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "next": "16.4.3",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "wink-eng-lite-web-model": "1.8.1",
+    "wink-nlp": "2.4.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "prettier": "3.8.2",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  },
+  "engines": {
+    "node": ">=22.17"
+  },
+  "packageManager": "pnpm@10.11.0"
+}
