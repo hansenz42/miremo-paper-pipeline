@@ -1,0 +1,47 @@
+[
+  {
+    "module": "workflow.py",
+    "source_experiment": "20261022-jate-extraction/workflow.py",
+    "source_sha256": "cae6999a0ac1d676f8d1589f3cc94db29915a15666dfa47097e98ae3d954dafb"
+  },
+  {
+    "module": "reading_text.py",
+    "source_experiment": "20261022-jate-extraction/reading_text.py",
+    "source_sha256": "5017259b0d90a356f9552242635210d1c60d09355124db846655384fdec52adb"
+  },
+  {
+    "module": "relations.py",
+    "source_experiment": "20261022-jate-extraction/relations.py",
+    "source_sha256": "bdc7d8e1acc9cf170656fb93c15c8965bc7f82c1ba185d1c52721a1d085828c0"
+  },
+  {
+    "module": "document_tables.py",
+    "source_experiment": "20261019-generic-preselection/document_tables.py",
+    "source_sha256": "6be272b3ba9afa70ac5b9d26cb677ff2fcffbd6dd005c47b979d39d5d8505c27"
+  },
+  {
+    "module": "reading_order.py",
+    "source_experiment": "20261019-generic-preselection/reading_order.py",
+    "source_sha256": "750e83bc34d2c6a03b045bf141b6de278f757bef7de86750904b1647196fe6a3"
+  },
+  {
+    "module": "term_matching.py",
+    "source_experiment": "20261019-generic-preselection/term_matching.py",
+    "source_sha256": "1613874f2a453ad1ca74cf33e5f0f4dc223c5bde447c4fe331829fb54289acfb"
+  },
+  {
+    "module": "splitter.py",
+    "source_experiment": "20261021-sharding-1200/splitter.py",
+    "source_sha256": "204854532986f09d92b875478bc4a7f90db8c18636f9ab08906a66e4989c4fa1"
+  },
+  {
+    "module": "input_budget.py",
+    "source_experiment": "20261024-candidate-refinement/input_budget.py",
+    "source_sha256": "123c53c284a9bc679325afa4422c28eb3ad7ee36953c0334fcf02d3e4283350a"
+  },
+  {
+    "module": "refine.py",
+    "source_experiment": "20261024-candidate-refinement/refine.py",
+    "source_sha256": "7561d3601727285cf7127abcc386b95705eac83465708f9bec28a6c946e277f7"
+  }
+]
